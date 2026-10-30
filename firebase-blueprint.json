@@ -1,0 +1,108 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile data stored at /users/{uid}",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "preferredLanguage": { "type": "string", "enum": ["bn", "en"] },
+        "theme": { "type": "string", "enum": ["dark", "light"] },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "isSuspended": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "FavoriteTool": {
+      "title": "FavoriteTool",
+      "description": "User favorite tools saved at /users/{uid}/favorites/{toolId}",
+      "type": "object",
+      "properties": {
+        "toolId": { "type": "string", "maxLength": 64 },
+        "toolName": { "type": "string", "maxLength": 120 },
+        "addedAt": { "type": "string" }
+      },
+      "required": ["toolId", "toolName"]
+    },
+    "ToolHistoryItem": {
+      "title": "ToolHistoryItem",
+      "description": "User tool history logged at /users/{uid}/toolHistory/{historyId}",
+      "type": "object",
+      "properties": {
+        "toolId": { "type": "string", "maxLength": 64 },
+        "toolName": { "type": "string", "maxLength": 120 },
+        "usedAt": { "type": "string" }
+      },
+      "required": ["toolId", "toolName"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Admin authorization entry at /admins/{uid}",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 150 },
+        "role": { "type": "string", "maxLength": 50 },
+        "assignedAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Site-wide announcement by admin at /announcements/{announcementId}",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 200 },
+        "content": { "type": "string", "maxLength": 2000 },
+        "type": { "type": "string", "enum": ["info", "warning", "update"] },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "content"]
+    },
+    "WebsiteSettings": {
+      "title": "WebsiteSettings",
+      "description": "Global website configuration at /settings/website",
+      "type": "object",
+      "properties": {
+        "maintenanceMode": { "type": "boolean" },
+        "allowNewRegistrations": { "type": "boolean" },
+        "bannerMessage": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["maintenanceMode"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profile documents"
+    },
+    "/users/{uid}/favorites/{toolId}": {
+      "schema": "FavoriteTool",
+      "description": "User favorite tools collection"
+    },
+    "/users/{uid}/toolHistory/{historyId}": {
+      "schema": "ToolHistoryItem",
+      "description": "User usage history log"
+    },
+    "/admins/{uid}": {
+      "schema": "AdminRecord",
+      "description": "Admin identity and authorization registry"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Global announcements readable by all, writable only by admins"
+    },
+    "/settings/website": {
+      "schema": "WebsiteSettings",
+      "description": "Global website settings readable by all, writable only by admins"
+    }
+  }
+}

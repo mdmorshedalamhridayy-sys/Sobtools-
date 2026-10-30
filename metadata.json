@@ -1,0 +1,6 @@
+{
+  "name": "SobTools",
+  "description": "All Your Tools in One Place — Fast, private, browser-based online tools for image, PDF, text, and creator workflows in Bengali and English.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

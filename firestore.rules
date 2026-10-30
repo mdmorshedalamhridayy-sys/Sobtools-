@@ -1,0 +1,162 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    function isUser(uid) { return isSignedIn() && request.auth.uid == uid; }
+
+    // Multi-factor Admin authorization check (case-insensitive email, admin doc, or user role)
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email != null && request.auth.token.email.matches('(?i)^mdmorshedalamhridayy@gmail\\.com$')) ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'])
+      );
+    }
+
+    // UserProfile schema validation
+    function isValidUserProfile(data) {
+      return data.uid is string && data.uid.size() <= 128 && data.uid == request.auth.uid &&
+        data.email is string && data.email.size() <= 150 &&
+        (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+        (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500)) &&
+        (!('preferredLanguage' in data) || data.preferredLanguage in ['bn', 'en']) &&
+        (!('theme' in data) || data.theme in ['dark', 'light']) &&
+        (!('role' in data) || data.role in ['user', 'admin', 'moderator', 'superadmin']) &&
+        (!('isSuspended' in data) || data.isSuspended is bool);
+    }
+
+    // User profile documents
+    match /users/{userId} {
+      allow get: if isUser(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isUser(userId) &&
+        isValidUserProfile(incoming()) &&
+        (!('role' in incoming()) || incoming().role == 'user' || isAdmin()) &&
+        (!('isSuspended' in incoming()) || incoming().isSuspended == false);
+      allow update: if (
+        (isUser(userId) && isValidUserProfile(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'preferredLanguage', 'theme', 'updatedAt']) &&
+          incoming().uid == existing().uid && incoming().email == existing().email) ||
+        isAdmin()
+      );
+      allow delete: if isUser(userId) || isAdmin();
+
+      // User favorites subcollection
+      match /favorites/{toolId} {
+        allow read: if isUser(userId) || isAdmin();
+        allow create, update: if isUser(userId) &&
+          isValidId(toolId) &&
+          incoming().toolId is string && incoming().toolId.size() <= 64 &&
+          incoming().toolName is string && incoming().toolName.size() <= 120;
+        allow delete: if isUser(userId) || isAdmin();
+      }
+
+      // User usage history subcollection
+      match /toolHistory/{historyId} {
+        allow read: if isUser(userId) || isAdmin();
+        allow create: if isUser(userId) &&
+          isValidId(historyId) &&
+          incoming().toolId is string && incoming().toolId.size() <= 64 &&
+          incoming().toolName is string && incoming().toolName.size() <= 120;
+        allow update, delete: if isUser(userId) || isAdmin();
+      }
+    }
+
+    // Admins registry
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Admin roles & permissions
+    match /adminRoles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Dynamic Tools CMS (Read by everyone, written by admins)
+    match /tools/{toolId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Dynamic Categories CMS
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Advertisements CMS
+    match /advertisements/{adId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Homepage Content CMS
+    match /homepageContent/{sectionId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Static Pages CMS (About, Privacy, Terms, FAQ, etc.)
+    match /pages/{pageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Global Site Settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Global siteSettings collection
+    match /siteSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Announcements
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Active User Sessions & Heartbeats
+    match /userSessions/{sessionId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create, update: if isSignedIn() && incoming().uid == request.auth.uid;
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    // Admin Audit Logs (Append-only by admins, immutable, no updates or deletes)
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Contact Messages Inbox (Anyone can submit, only admins can view/manage)
+    match /messages/{messageId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Aggregated Usage Analytics
+    match /analytics/{metricId} {
+      allow read: if isAdmin();
+      allow write: if isSignedIn() || isAdmin();
+    }
+  }
+}
